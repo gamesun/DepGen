@@ -1,0 +1,41 @@
+# Windows
+CC = path/of/gcc.exe
+TARGET = abc
+BUILD_PATH = build
+OBJ_PATH = $(BUILD_PATH)/obj
+include $(BUILD_PATH)/$(TARGET).dep
+OBJ_WITH_BUILD_DIR += $(OBJ_PATH)/build_info.obj
+DEFINES += -DBUILD_INFO
+DATETIME = $(shell linux_date +"%Y-%m-%d %H:%M:%S")
+COMMIT_ID = $(shell $(GIT_PATH)\git rev-parse HEAD)
+DIRTY = $(shell $(GIT_PATH)\git diff --quiet || echo -dirty)
+CFLAGS = $(DEFINES) $(INCLUDES)
+LDFLAGS1 = -g -O2 $(DEFINES)
+LDFLAGS2 = $(INCLUDES)
+LDFLAGS3 = -Map,$(MAP)
+
+all:build_prepare gen_build_info $(TARGET).out
+
+$(TARGET).out: $(OBJ_WITH_BUILD_DIR)
+	@echo linking...
+	@$(CC) $(LDFLAGS1) -o $(BUILD_PATH)/$@ $(LDFLAGS2) $^ $(LDFLAGS3)
+	@echo [42;01m [date time]: $(DATETIME)[0m
+	@echo [42;01m [commit id]: $(COMMIT_ID)[41;01m$(DIRTY)[0m
+
+build_prepare:
+	@if not exist $(OBJ_PATH) ( \
+		mkdir $(subst /,\,$(OBJ_PATH)); \
+	)
+
+gen_build_info:
+	@echo // WARNING! All changes made in this file will be lost when regenerate !> build_info.c
+	@echo const char __compile_datetime[22] = "[$(DATETIME)]";>> build_info.c
+	@echo const char __commit_id[49] = "[$(COMMIT_ID)$(DIRTY)]";>> build_info.c
+
+$(OBJ_PATH)/build_info.obj: build_info.c
+	@echo compiling $(notdir $<)
+	@$(CC) $(CFLAGS) -c -o $@ $<
+
+clean:build_prepare
+	@echo cleaning...
+	@del $(BUILD_PATH)\$(TARGET).out $(subst /,\, $(OBJ_WITH_BUILD_DIR))
